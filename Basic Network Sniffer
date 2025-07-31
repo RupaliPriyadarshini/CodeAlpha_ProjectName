@@ -1,0 +1,38 @@
+from scapy.all import sniff, IP, TCP, wrpcap
+import pandas as pd
+import time
+
+packet_log = []
+
+def process_packet(packet):
+    if IP in packet:
+        src_ip = packet[IP].src
+        dst_ip = packet[IP].dst
+        proto = "TCP" if TCP in packet else packet[IP].proto
+        
+        payload = b''
+        if TCP in packet:
+            payload = bytes(packet[TCP].payload)
+        
+        # Filter for HTTP traffic (port 80)
+        if TCP in packet and (packet[TCP].sport == 80 or packet[TCP].dport == 80):
+            print(f"[HTTP] {src_ip} --> {dst_ip} | Payload: {payload[:50]}")
+        
+        # Save packet info for CSV
+        packet_log.append({
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "src_ip": src_ip,
+            "dst_ip": dst_ip,
+            "protocol": proto,
+            "payload_preview": payload[:50]
+        })
+
+print("Starting advanced packet capture... Press Ctrl+C to stop.")
+captured_packets = sniff(prn=process_packet, count=100, store=True)  # Capture 100 packets
+
+df = pd.DataFrame(packet_log)
+df.to_csv("captured_packets.csv", index=False)
+print("Packet log saved as captured_packets.csv")
+
+wrpcap("captured_packets.pcap", captured_packets)
+print("Raw packets saved as captured_packets.pcap")
